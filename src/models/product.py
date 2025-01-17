@@ -55,21 +55,29 @@ class Product:
         finally:
             cursor.close()
 
-    def deactivate_with_connection(cls, existing_conn, product_id):
+    @classmethod
+    def toggle_availability_with_connection(cls, existing_conn, product_id):
         cursor = existing_conn.cursor()
         try:
-            sql = "UPDATE products SET is_available = 0 WHERE product_id = %s"
-            cursor.execute(sql, (product_id,))
-            if cursor.rowcount == 0:
-                print(f"Produkt ID {product_id} nebyl nalezen nebo je již neaktivní.")
-            else:
-                print(f"Produkt ID {product_id} byl úspěšně deaktivován.")
+            cursor.execute("SELECT is_available FROM products WHERE product_id = %s", (product_id,))
+            result = cursor.fetchone()
+            if not result:
+                print(f"Produkt ID {product_id} nebyl nalezen.")
+                return
+
+            current_status = result[0]
+            new_status = 0 if current_status == 1 else 1
+
+            sql = "UPDATE products SET is_available = %s WHERE product_id = %s"
+            cursor.execute(sql, (new_status, product_id))
+            status_text = "deaktivován" if new_status == 0 else "aktivován"
+            print(f"Produkt ID {product_id} byl úspěšně {status_text}.")
         except mysql.connector.Error as db_err:
-            print(f"DB Error (Product.deactivate_with_connection): {db_err}")
+            print(f"DB Error (Product.toggle_availability_with_connection): {db_err}")
             existing_conn.rollback()
             raise
         except Exception as e:
-            print(f"Obecná chyba (Product.deactivate_with_connection): {e}")
+            print(f"Obecná chyba (Product.toggle_availability_with_connection): {e}")
             existing_conn.rollback()
             raise
         finally:

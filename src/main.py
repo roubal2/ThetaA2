@@ -17,11 +17,11 @@ def main():
     while True:
         print("\n--- Hlavní menu ---")
         print("1) Přidat uživatele")
-        print("2) Vytvořit objednávku (transakce)")
+        print("2) Vytvořit objednávku")
         print("3) Generovat report")
         print("4) Import dat (CSV/JSON)")
         print("5) Zobrazení produktů")
-        print("6) Odstranění produktu")
+        print("6) Změnit dostupnost produktu")
         print("7) Upravení ceny produktu")
         print("8) Konec")
 
@@ -38,7 +38,7 @@ def main():
         elif choice == "5":
             handle_view_products()
         elif choice == "6":
-            handle_delete_product()
+            handle_toggle_product()
         elif choice == "7":
             handle_update_product()
         elif choice == "8":
@@ -188,53 +188,47 @@ def handle_view_products():
             return
         print("\n--- Seznam Všech Produktů ---")
         for product in products:
-            status = "Aktivní" if product.is_active else "Neaktivní"
+            status = "Na skladu" if product.is_available else "Došla zásoba"
             print(
                 f"ID: {product.product_id}, Kategorie: {product.category_id}, Název: {product.product_name}, Cena: {product.price:.2f}, Stav: {status}")
     except Exception as e:
         print(f"Chyba při zobrazování produktů: {e}")
 
 
-def handle_delete_product():
-    conn = get_connection()
+def handle_toggle_product():
     try:
-        product_id_str = input("Zadej ID produktu, který chceš smazat: ").strip()
+        product_id_str = input("Zadej ID produktu, který chceš přepnout stav dostupnosti: ").strip()
         product_id = int(product_id_str)
         product = Product.read(product_id)
         if not product:
-            print(f"Produkt s ID {product_id} neexistuje.")
+            print(f"Produkt s ID {product_id} neexistuje nebo je aktuálně neaktivní.")
             return
 
-        confirmation = input(
-            f"Jsi si jistý, že chceš smazat produkt '{product.product_name}' (ID {product.product_id})? (y/n): ").strip().lower()
+        status = "aktivován" if product.is_available else "deaktivován"
+        confirmation = input(f"Jsi si jistý, že chceš {status} produkt '{product.product_name}' (ID {product.product_id})? (y/n): ").strip().lower()
         if confirmation != 'y':
-            print("Smazání produktu bylo zrušeno.")
+            print("Operace byla zrušena.")
             return
 
+        conn = get_connection()
         try:
             conn.start_transaction()
 
-            Product.deactivate_with_connection(conn, product_id)
+            Product.toggle_availability_with_connection(conn, product_id)
 
             conn.commit()
-        except mysql.connector.Error as db_err:
-            print(f"DB Error při deaktivaci produktu: {db_err}")
-            conn.rollback()
         except Exception as e:
-            print(f"Obecná chyba při deaktivaci produktu: {e}")
+            print(f"Chyba při přepínání stavu produktu: {e}")
             conn.rollback()
         finally:
             conn.close()
             print("Databázové spojení bylo uzavřeno.")
     except ValueError:
-        print("Chyba: Špatný formát čísla.")
+        print("Chyba: ID produktu musí být celé číslo.")
     except mysql.connector.Error as db_err:
-        print(f"DB Error při mazání produktu: {db_err}")
+        print(f"DB Error při přepínání stavu produktu: {db_err}")
     except Exception as e:
-        print(f"Obecná chyba při mazání produktu: {e}")
-    finally:
-        if 'conn' in locals() and conn.is_connected():
-            conn.close()
+        print(f"Obecná chyba při přepínání stavu produktu: {e}")
 
 
 def handle_update_product():
