@@ -14,11 +14,12 @@ class OrderItem:
             sql = """INSERT INTO orderItems (order_id, product_id, quantity) VALUES (%s, %s, %s)"""
             cursor.execute(sql, (self.order_id, self.product_id, self.quantity))
             conn.commit()
-        except mysql.connector.Error as e:
-            print("DB Error:", e)
+        except mysql.connector.Error as db_err:
+            print(f"DB Error (orderItem.create): {db_err}")
+            conn.rollback()
+        except Exception as e:
+            print(f"Obecná chyba (orderItem.create): {e}")
             conn.rollback()
         finally:
             cursor.close()
             conn.close()
-
-    # read/update/delete analogicky

@@ -23,8 +23,11 @@ class User:
             cursor.execute(sql, values)
             conn.commit()
             self.user_id = cursor.lastrowid
-        except mysql.connector.Error as e:
-            print("DB Error:", e)
+        except mysql.connector.Error as db_err:
+            print(f"DB Error (User.create): {db_err}")
+            conn.rollback()
+        except Exception as e:
+            print(f"Obecná chyba (User.create): {e}")
             conn.rollback()
         finally:
             cursor.close()

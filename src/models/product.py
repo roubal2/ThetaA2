@@ -22,11 +22,12 @@ class Product:
             cursor.execute(sql, values)
             conn.commit()
             self.product_id = cursor.lastrowid
-        except mysql.connector.Error as e:
-            print("DB Error:", e)
+        except mysql.connector.Error as db_err:
+            print(f"DB Error (Product.create): {db_err}")
+            conn.rollback()
+        except Exception as e:
+            print(f"Obecná chyba (Product.create): {e}")
             conn.rollback()
         finally:
             cursor.close()
             conn.close()
-
-    # read/update/delete podobně

@@ -14,11 +14,12 @@ class Category:
             cursor.execute(sql, (self.category_name,))
             conn.commit()
             self.category_id = cursor.lastrowid
-        except mysql.connector.Error as e:
-            print("DB Error:", e)
+        except mysql.connector.Error as db_err:
+            print(f"DB Error (Category.create): {db_err}")
+            conn.rollback()
+        except Exception as e:
+            print(f"Obecná chyba (Category.create): {e}")
             conn.rollback()
         finally:
             cursor.close()
             conn.close()
-
-    # read/update/delete analogicky jako u User
