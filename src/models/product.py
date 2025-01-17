@@ -2,7 +2,7 @@ from src.database_connection import get_connection
 import mysql.connector
 
 class Product:
-    def __init__(self, product_id=None, category_id=None, product_name=None, price=0.0, created_at=None, is_available=True):
+    def __init__(self, product_id=None, category_id=None, product_name=None, price=0.0, created_at=None, is_available=1):
         self.product_id = product_id
         self.category_id = category_id
         self.product_name = product_name
@@ -14,7 +14,7 @@ class Product:
         cursor = existing_conn.cursor()
         try:
             sql = """
-                INSERT INTO products (category_id, product_name, price, created_at, is_active)
+                INSERT INTO products (category_id, product_name, price, created_at, is_available)
                 VALUES (%s, %s, %s, NOW(), %s)
             """
             values = (self.category_id, self.product_name, self.price, self.is_available)
@@ -50,6 +50,26 @@ class Product:
             raise
         except Exception as e:
             print(f"Obecná chyba (Product.update_with_connection): {e}")
+            existing_conn.rollback()
+            raise
+        finally:
+            cursor.close()
+
+    def deactivate_with_connection(cls, existing_conn, product_id):
+        cursor = existing_conn.cursor()
+        try:
+            sql = "UPDATE products SET is_available = 0 WHERE product_id = %s"
+            cursor.execute(sql, (product_id,))
+            if cursor.rowcount == 0:
+                print(f"Produkt ID {product_id} nebyl nalezen nebo je již neaktivní.")
+            else:
+                print(f"Produkt ID {product_id} byl úspěšně deaktivován.")
+        except mysql.connector.Error as db_err:
+            print(f"DB Error (Product.deactivate_with_connection): {db_err}")
+            existing_conn.rollback()
+            raise
+        except Exception as e:
+            print(f"Obecná chyba (Product.deactivate_with_connection): {e}")
             existing_conn.rollback()
             raise
         finally:

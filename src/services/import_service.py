@@ -1,5 +1,6 @@
 import csv
 import json
+import mysql.connector
 from src.models.user import User
 from src.models.category import Category
 from src.models.product import Product
@@ -26,34 +27,39 @@ def import_categories_csv(csv_path):
         print(f"Chyba při importu kategorií: {e}")
 
 
+# src/services/import_service.py
+
 def import_products_json(json_path):
-    conn = get_connection()
-    cursor = conn.cursor()
     try:
-        with open(json_path, 'r', encoding='utf-8') as f:
-            data = json.load(f)
-            for item in data:
-                p = Product(
-                    category_id=item["category_id"],
-                    product_name=item["product_name"],
-                    price=item["price"]
-                )
-                p.create_with_connection(conn)
+        with open(json_path, 'r', encoding='utf-8') as file:
+            products_data = json.load(file)
+
+        conn = get_connection()
+        cursor = conn.cursor()
+
+        for product in products_data:
+            is_available = product.get('is_available', 1)
+            new_product = Product(
+                category_id=product.get('category_id'),
+                product_name=product.get('product_name'),
+                price=product.get('price'),
+                is_available=is_available
+            )
+            print(f"Importuji produkt: Název={new_product.product_name}")
+            new_product.create_with_connection(conn)
+
         conn.commit()
-        print("Import produktů z JSON úspěšně dokončen.")
-    except FileNotFoundError:
-        print(f"Chyba: Soubor {json_path} nebyl nalezen.")
-    except KeyError as e:
-        print(f"Chyba: V JSON chybí klíč {e}")
-    except json.JSONDecodeError:
-        print("Chyba: Soubor není validní JSON.")
+        print(f"Úspěšně importováno {len(products_data)} produktů.")
     except Exception as e:
         print(f"Chyba při importu produktů: {e}")
+        if conn:
+            conn.rollback()
     finally:
-        if 'cursor' in locals():
+        if 'cursor' in locals() and cursor:
             cursor.close()
         if 'conn' in locals() and conn.is_connected():
             conn.close()
+
 
 def import_users_csv(csv_path):
     conn = get_connection()
@@ -123,31 +129,51 @@ def import_orders_csv(csv_path):
         if 'conn' in locals() and conn.is_connected():
             conn.close()
 
+
+# src/services/import_service.py
+
 def import_order_items_json(json_path):
     conn = get_connection()
     cursor = conn.cursor()
     try:
-        with open(json_path, 'r', encoding='utf-8') as f:
-            data = json.load(f)
-            for item in data:
-                oi = OrderItem(
-                    order_id=item["order_id"],
-                    product_id=item["product_id"],
-                    quantity=item["quantity"]
-                )
-                oi.create_with_connection(conn)
+        with open(json_path, 'r', encoding='utf-8') as file:
+            order_items_data = json.load(file)
+
+        for item in order_items_data:
+            order_id = item.get('order_id')
+            product_id = item.get('product_id')
+            quantity = item.get('quantity', 1)
+
+            cursor.execute("SELECT 1 FROM products WHERE product_id = %s AND is_available = 1", (product_id,))
+            if not cursor.fetchone():
+                print(f"Varování: Produkt s ID {product_id} neexistuje nebo není dostupný. Přeskakuji položku.")
+                continue
+
+            new_order_item = OrderItem(
+                order_id=order_id,
+                product_id=product_id,
+                quantity=quantity
+            )
+            print(f"Importuji položku objednávky: order_id={order_id}, product_id={product_id}")
+            new_order_item.create_with_connection(conn)
+
         conn.commit()
-        print("Import orderItems z JSON úspěšně dokončen.")
+        print(f"Úspěšně importováno {len(order_items_data)} položek objednávek.")
     except FileNotFoundError:
         print(f"Chyba: Soubor {json_path} nebyl nalezen.")
-    except KeyError as e:
-        print(f"Chyba: V JSON chybí klíč {e}")
     except json.JSONDecodeError:
-        print("Chyba: Soubor není validní JSON.")
+        print("Chyba: Nesprávný formát JSON souboru.")
+    except mysql.connector.Error as db_err:
+        print(f"DB Error při importu order_items: {db_err}")
+        if conn:
+            conn.rollback()
     except Exception as e:
-        print(f"Chyba při importu order_items: {e}")
+        print(f"Obecná chyba při importu order_items: {e}")
+        if conn:
+            conn.rollback()
     finally:
-        if 'cursor' in locals():
+        if 'cursor' in locals() and cursor:
             cursor.close()
         if 'conn' in locals() and conn.is_connected():
             conn.close()
+            print("Databázové spojení bylo uzavřeno.")

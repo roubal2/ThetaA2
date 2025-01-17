@@ -12,6 +12,7 @@ from src.services.import_service import (
 )
 from src.utils.report import generate_report
 
+
 def main():
     while True:
         print("\n--- Hlavní menu ---")
@@ -46,6 +47,7 @@ def main():
         else:
             print("Neplatná volba, zkus to znovu.")
 
+
 def handle_create_user():
     conn = get_connection()
     try:
@@ -60,7 +62,7 @@ def handle_create_user():
             return
 
         is_active_int = int(is_active_str)
-        if is_active_int not in (0,1):
+        if is_active_int not in (0, 1):
             print("Chyba: Zadej 0 nebo 1 pro is_active.")
             return
         is_active = bool(is_active_int)
@@ -76,6 +78,7 @@ def handle_create_user():
     finally:
         if conn and conn.is_connected():
             conn.close()
+
 
 def handle_create_order_trans():
     try:
@@ -103,6 +106,7 @@ def handle_create_order_trans():
     except Exception as e:
         print(f"Chyba při vytváření objednávky: {e}")
 
+
 def parse_category_product_input(items_input):
     result = []
     pairs = items_input.split(';')
@@ -123,12 +127,14 @@ def parse_category_product_input(items_input):
             print(f"Varování: product_id '{prod_id_str}' není platné číslo. Přeskakuji.")
     return result
 
+
 def handle_generate_report():
     try:
         data = generate_report()
         print("Souhrnný report:", data)
     except Exception as e:
         print(f"Chyba při generování reportu: {e}")
+
 
 def handle_import_menu():
     print("\n--- Import dat ---")
@@ -173,6 +179,7 @@ def handle_import_menu():
     else:
         print("Neplatná volba importu.")
 
+
 def handle_view_products():
     try:
         products = Product.read_all(include_inactive=True)
@@ -182,9 +189,11 @@ def handle_view_products():
         print("\n--- Seznam Všech Produktů ---")
         for product in products:
             status = "Aktivní" if product.is_active else "Neaktivní"
-            print(f"ID: {product.product_id}, Kategorie: {product.category_id}, Název: {product.product_name}, Cena: {product.price:.2f}, Stav: {status}")
+            print(
+                f"ID: {product.product_id}, Kategorie: {product.category_id}, Název: {product.product_name}, Cena: {product.price:.2f}, Stav: {status}")
     except Exception as e:
         print(f"Chyba při zobrazování produktů: {e}")
+
 
 def handle_delete_product():
     conn = get_connection()
@@ -196,7 +205,8 @@ def handle_delete_product():
             print(f"Produkt s ID {product_id} neexistuje.")
             return
 
-        confirmation = input(f"Jsi si jistý, že chceš smazat produkt '{product.product_name}' (ID {product.product_id})? (y/n): ").strip().lower()
+        confirmation = input(
+            f"Jsi si jistý, že chceš smazat produkt '{product.product_name}' (ID {product.product_id})? (y/n): ").strip().lower()
         if confirmation != 'y':
             print("Smazání produktu bylo zrušeno.")
             return
@@ -204,10 +214,7 @@ def handle_delete_product():
         try:
             conn.start_transaction()
 
-            cursor = conn.cursor()
-            sql = "UPDATE products SET is_active = FALSE WHERE product_id = %s"
-            cursor.execute(sql, (product_id,))
-            print(f"Produkt ID {product_id} byl úspěšně deaktivován.")
+            Product.deactivate_with_connection(conn, product_id)
 
             conn.commit()
         except mysql.connector.Error as db_err:
@@ -228,6 +235,7 @@ def handle_delete_product():
     finally:
         if 'conn' in locals() and conn.is_connected():
             conn.close()
+
 
 def handle_update_product():
     conn = get_connection()
@@ -268,6 +276,7 @@ def handle_update_product():
     finally:
         if 'conn' in locals() and conn.is_connected():
             conn.close()
+
 
 if __name__ == "__main__":
     main()
