@@ -7,19 +7,18 @@ class OrderItem:
         self.product_id = product_id
         self.quantity = quantity
 
-    def create(self):
-        conn = get_connection()
-        cursor = conn.cursor()
+    def create_with_connection(self, existing_conn):
+        cursor = existing_conn.cursor()
         try:
             sql = """INSERT INTO orderItems (order_id, product_id, quantity) VALUES (%s, %s, %s)"""
             cursor.execute(sql, (self.order_id, self.product_id, self.quantity))
-            conn.commit()
+            existing_conn.commit()
         except mysql.connector.Error as db_err:
             print(f"DB Error (orderItem.create): {db_err}")
-            conn.rollback()
+            existing_conn.rollback()
         except Exception as e:
             print(f"Obecná chyba (orderItem.create): {e}")
-            conn.rollback()
+            existing_conn.rollback()
         finally:
             cursor.close()
-            conn.close()
+            existing_conn.close()

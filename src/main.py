@@ -2,7 +2,7 @@
 import sys
 from src.models.user import User
 from src.models.order import Order
-from src.services.order_service import create_order_with_items
+from src.services.order_service import create_order_interactive
 from src.services.import_service import (
     import_categories_csv, import_orders_csv,
     import_users_csv, import_order_items_json, import_products_json
@@ -41,8 +41,7 @@ def handle_create_user():
         balance_str = input("Zadej počáteční zůstatek (balance): ").strip()
         is_active_str = input("Uživatel aktivní? (1 = ano, 0 = ne): ").strip()
 
-        # Ověření a konverze
-        balance = float(balance_str)  # pokud je to neplatné, vyhodí ValueError
+        balance = float(balance_str)
         if balance < 0:
             print("Chyba: Zůstatek nesmí být záporný.")
             return
@@ -62,15 +61,48 @@ def handle_create_user():
         print(f"Chyba při vytváření uživatele: {e}")
 
 def handle_create_order_trans():
-    user_id_str = input("Zadej ID uživatele: ").strip()
     try:
+        user_id_str = input("Zadej ID uživatele (customer_id): ").strip()
         user_id = int(user_id_str)
-        order_id = create_order_with_items(user_id, [(1,2), (2,1)])
-        print(f"Objednávka (ID: {order_id}) byla úspěšně vytvořena.")
+
+        items_input = input("Zadej položky objednávky ve formátu category_id:product_id;...: ").strip()
+        if not items_input:
+            print("Nebyla zadána žádná položka. Ruším objednávku.")
+            return
+
+        list_of_items = parse_category_product_input(items_input)
+
+        order_id = create_order_interactive(user_id, list_of_items)
+
+        if order_id is not None:
+            print(f"Objednávka (ID: {order_id}) byla úspěšně vytvořena.")
+        else:
+            print("Objednávka se nezaložila (uživatel nemá dostatek peněz nebo jiná chyba).")
+
     except ValueError:
-        print("Chyba: Zadej číselné user_id.")
+        print("Chyba: Zadej platné číslo pro user_id.")
     except Exception as e:
         print(f"Chyba při vytváření objednávky: {e}")
+
+def parse_category_product_input(items_input):
+    result = []
+    pairs = items_input.split(';')
+    for pair in pairs:
+        pair = pair.strip()
+        if not pair:
+            continue
+        parts = pair.split(':')
+        if len(parts) < 2:
+            print(f"Varování: neplatný formát '{pair}'. Přeskakuji.")
+            continue
+        prod_id_str = parts[1]
+
+        try:
+            prod_id = int(prod_id_str)
+            result.append(prod_id)
+        except ValueError:
+            print(f"Varování: product_id '{prod_id_str}' není platné číslo. Přeskakuji.")
+    return result
 
 def handle_generate_report():
     try:

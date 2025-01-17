@@ -1,47 +1,78 @@
 from src.database_connection import get_connection
 from src.models.order import Order
 from src.models.orderItem import OrderItem
+from src.models.user import User
+from src.models.product import Product
 import mysql.connector
 
-def create_order_with_items(user_id, items):
-    """
-    Vytvoří novou objednávku pro daného uživatele (user_id).
-    'items' je list tuple (product_id, quantity).
-    Vše probíhá v jedné transakci.
-    """
+def create_order_interactive(user_id, product_ids):
     conn = get_connection()
-    cursor = conn.cursor()
     try:
         conn.start_transaction()
-        # 1) Vytvořit záznam v `orders`
-        sql_order = """INSERT INTO orders (user_id, order_date) VALUES (%s, NOW())"""
-        cursor.execute(sql_order, (user_id,))
-        new_order_id = cursor.lastrowid
+        cursor = conn.cursor()
 
-        # 2) Vložit řádky do `orderItems`
-        for (p_id, qty) in items:
-            sql_item = """INSERT INTO orderItems (order_id, product_id, quantity)
-                          VALUES (%s, %s, %s)"""
-            cursor.execute(sql_item, (new_order_id, p_id, qty))
+        user = User.read(user_id)
+        if not user:
+            print(f"Uživatel s ID {user_id} neexistuje.")
+            conn.rollback()
+            return None
 
-        # 3) Přepočítat `order_total` (join s products)
-        sql_update_total = """
-            UPDATE orders
-            SET order_total = (
-                SELECT SUM(p.price * oi.quantity)
-                FROM orderItems oi
-                JOIN products p ON oi.product_id = p.product_id
-                WHERE oi.order_id = %s
-            )
-            WHERE order_id = %s
-        """
-        cursor.execute(sql_update_total, (new_order_id, new_order_id))
+        total_price = 0.0
+        for prod_id in product_ids:
+            product = Product.read(prod_id)
+            if not product:
+                print(f"Produkt s ID {prod_id} neexistuje. Přeskakuji.")
+                continue
+            total_price += product.price
+
+        if total_price == 0:
+            print("Žádné platné produkty, objednávka nebude vytvořena.")
+            conn.rollback()
+            return None
+
+        if user.balance < total_price:
+            print(f"Nedostatek peněz. Potřebujeme {total_price}, ale user má {user.balance}.")
+            conn.rollback()
+            return None
+
+        new_order = Order(user_id=user.user_id, order_total=0.0)
+        new_order.create_with_connection(conn)
+        order_id = new_order.order_id
+
+        for prod_id in product_ids:
+            product = Product.read(prod_id)
+            if not product:
+                continue
+            order_item = OrderItem(order_id=order_id, product_id=prod_id, quantity=1)
+            order_item.create_with_connection(conn)
+
+        sql_sum = """
+                UPDATE orders
+                SET order_total = (
+                    SELECT SUM(p.price * oi.quantity)
+                    FROM orderItems oi
+                    JOIN products p ON oi.product_id = p.product_id
+                    WHERE oi.order_id = %s
+                )
+                WHERE order_id = %s
+            """
+        cursor.execute(sql_sum, (order_id, order_id))
+
+        new_balance = user.balance - total_price
+        sql_user_update = "UPDATE users SET balance=%s WHERE user_id=%s"
+        cursor.execute(sql_user_update, (new_balance, user.user_id))
 
         conn.commit()
-        return new_order_id
-    except mysql.connector.Error as e:
+        return order_id
+
+    except mysql.connector.Error as db_err:
+        print(f"DB Error (create_order_interactive): {db_err}")
         conn.rollback()
-        raise e
+        return None
+    except Exception as e:
+        print(f"Obecná chyba (create_order_interactive): {e}")
+        conn.rollback()
+        return None
     finally:
         cursor.close()
         conn.close()

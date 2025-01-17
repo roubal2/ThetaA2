@@ -31,3 +31,24 @@ class Product:
         finally:
             cursor.close()
             conn.close()
+
+    @classmethod
+    def read(cls, product_id):
+        conn = get_connection()
+        cursor = conn.cursor(dictionary=True)
+        try:
+            sql = "SELECT * FROM products WHERE product_id=%s"
+            cursor.execute(sql, (product_id,))
+            row = cursor.fetchone()
+            if row:
+                return cls(
+                    product_id=row["product_id"],
+                    category_id=row["category_id"],
+                    product_name=row["product_name"],
+                    price=row["price"],
+                    created_at=row["created_at"]
+                )
+            return None
+        finally:
+            cursor.close()
+            conn.close()

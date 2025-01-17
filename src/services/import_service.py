@@ -87,7 +87,7 @@ def import_orders_csv(csv_path):
                     order_status=order_status,
                     order_date=order_date
                 )
-                o.create()
+                o.create_with_connection()
         print("Import objednávek z CSV úspěšně dokončen.")
     except FileNotFoundError:
         print(f"Chyba: Soubor {csv_path} nebyl nalezen.")
@@ -108,7 +108,7 @@ def import_order_items_json(json_path):
                     product_id=item["product_id"],
                     quantity=item["quantity"]
                 )
-                oi.create()
+                oi.create_with_connection()
         print("Import orderItems z JSON úspěšně dokončen.")
     except FileNotFoundError:
         print(f"Chyba: Soubor {json_path} nebyl nalezen.")
