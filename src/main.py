@@ -1,7 +1,9 @@
 # -*- coding: utf-8 -*-
 import sys
+import mysql.connector
 from src.models.user import User
 from src.models.order import Order
+from src.models.product import Product
 from src.database_connection import get_connection
 from src.services.order_service import create_order_interactive
 from src.services.import_service import (
@@ -17,9 +19,12 @@ def main():
         print("2) Vytvořit objednávku (transakce)")
         print("3) Generovat report")
         print("4) Import dat (CSV/JSON)")
-        print("5) Konec")
+        print("5) Zobrazení produktů")
+        print("6) Odstranění produktu")
+        print("7) Upravení ceny produktu")
+        print("8) Konec")
 
-        choice = input("Vyberte akci (1-5): ").strip()
+        choice = input("Vyberte akci (1-8): ").strip()
 
         if choice == "1":
             handle_create_user()
@@ -30,6 +35,12 @@ def main():
         elif choice == "4":
             handle_import_menu()
         elif choice == "5":
+            handle_view_products()
+        elif choice == "6":
+            handle_delete_product()
+        elif choice == "7":
+            handle_update_product()
+        elif choice == "8":
             print("Ukončuji aplikaci.")
             sys.exit(0)
         else:
@@ -161,6 +172,102 @@ def handle_import_menu():
         print("Návrat do hlavního menu.")
     else:
         print("Neplatná volba importu.")
+
+def handle_view_products():
+    try:
+        products = Product.read_all(include_inactive=True)
+        if not products:
+            print("Žádné produkty nebyly nalezeny.")
+            return
+        print("\n--- Seznam Všech Produktů ---")
+        for product in products:
+            status = "Aktivní" if product.is_active else "Neaktivní"
+            print(f"ID: {product.product_id}, Kategorie: {product.category_id}, Název: {product.product_name}, Cena: {product.price:.2f}, Stav: {status}")
+    except Exception as e:
+        print(f"Chyba při zobrazování produktů: {e}")
+
+def handle_delete_product():
+    conn = get_connection()
+    try:
+        product_id_str = input("Zadej ID produktu, který chceš smazat: ").strip()
+        product_id = int(product_id_str)
+        product = Product.read(product_id)
+        if not product:
+            print(f"Produkt s ID {product_id} neexistuje.")
+            return
+
+        confirmation = input(f"Jsi si jistý, že chceš smazat produkt '{product.product_name}' (ID {product.product_id})? (y/n): ").strip().lower()
+        if confirmation != 'y':
+            print("Smazání produktu bylo zrušeno.")
+            return
+
+        try:
+            conn.start_transaction()
+
+            cursor = conn.cursor()
+            sql = "UPDATE products SET is_active = FALSE WHERE product_id = %s"
+            cursor.execute(sql, (product_id,))
+            print(f"Produkt ID {product_id} byl úspěšně deaktivován.")
+
+            conn.commit()
+        except mysql.connector.Error as db_err:
+            print(f"DB Error při deaktivaci produktu: {db_err}")
+            conn.rollback()
+        except Exception as e:
+            print(f"Obecná chyba při deaktivaci produktu: {e}")
+            conn.rollback()
+        finally:
+            conn.close()
+            print("Databázové spojení bylo uzavřeno.")
+    except ValueError:
+        print("Chyba: Špatný formát čísla.")
+    except mysql.connector.Error as db_err:
+        print(f"DB Error při mazání produktu: {db_err}")
+    except Exception as e:
+        print(f"Obecná chyba při mazání produktu: {e}")
+    finally:
+        if 'conn' in locals() and conn.is_connected():
+            conn.close()
+
+def handle_update_product():
+    conn = get_connection()
+    try:
+        product_id_str = input("Zadej ID produktu, který chceš aktualizovat: ").strip()
+        product_id = int(product_id_str)
+        product = Product.read(product_id)
+        if not product:
+            print(f"Produkt s ID {product_id} neexistuje.")
+            return
+
+        print(f"Aktualizace Ceny Produktu ID {product.product_id}: {product.product_name}")
+        new_price_str = input(f"Nová cena (aktuální: {product.price}): ").strip()
+
+        if not new_price_str:
+            print("Nebyla zadána žádná nová cena. Aktualizace byla zrušena.")
+            return
+
+        try:
+            new_price = float(new_price_str)
+            if new_price < 0:
+                print("Chyba: Cena nemůže být záporná.")
+                return
+        except ValueError:
+            print("Chyba: Špatný formát ceny. Zadej číslo (např. 29.99).")
+            return
+
+        product.price = new_price
+        product.update_with_connection(conn)
+        conn.commit()
+        print(f"Cena Produktu ID {product.product_id} byl úspěšně aktualizován.")
+    except ValueError:
+        print("Chyba: Špatný formát čísla.")
+    except mysql.connector.Error as db_err:
+        print(f"DB Error při aktualizaci produktu: {db_err}")
+    except Exception as e:
+        print(f"Obecná chyba při aktualizaci produktu: {e}")
+    finally:
+        if 'conn' in locals() and conn.is_connected():
+            conn.close()
 
 if __name__ == "__main__":
     main()

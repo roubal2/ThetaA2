@@ -21,6 +21,7 @@ category_id int not null,
 product_name varchar(255) not null,
 price float not null check (price >= 0) default 0.0,
 created_at datetime default current_timestamp,
+is_available boolean default 1,
 foreign key (category_id) references categories(category_id)
 );
 
