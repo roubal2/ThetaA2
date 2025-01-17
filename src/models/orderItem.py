@@ -11,14 +11,16 @@ class OrderItem:
         cursor = existing_conn.cursor()
         try:
             sql = """INSERT INTO orderItems (order_id, product_id, quantity) VALUES (%s, %s, %s)"""
+            print(f"Vkládám položku objednávky: order_id={self.order_id}, product_id={self.product_id}, quantity={self.quantity}")
             cursor.execute(sql, (self.order_id, self.product_id, self.quantity))
-            existing_conn.commit()
+            self.order_item_id = cursor.lastrowid
         except mysql.connector.Error as db_err:
-            print(f"DB Error (orderItem.create): {db_err}")
+            print(f"DB Error (orderItem.create_with_connection): {db_err}")
             existing_conn.rollback()
+            raise
         except Exception as e:
-            print(f"Obecná chyba (orderItem.create): {e}")
+            print(f"Obecná chyba (orderItem.create_with_connection): {e}")
             existing_conn.rollback()
+            raise
         finally:
             cursor.close()
-            existing_conn.close()

@@ -18,51 +18,42 @@ def create_order_interactive(user_id, product_ids):
             return None
 
         total_price = 0.0
+        valid_product_ids = []
         for prod_id in product_ids:
             product = Product.read(prod_id)
             if not product:
                 print(f"Produkt s ID {prod_id} neexistuje. Přeskakuji.")
                 continue
             total_price += product.price
+            valid_product_ids.append(prod_id)
 
         if total_price == 0:
             print("Žádné platné produkty, objednávka nebude vytvořena.")
             conn.rollback()
             return None
 
-        if user.balance < total_price:
-            print(f"Nedostatek peněz. Potřebujeme {total_price}, ale user má {user.balance}.")
-            conn.rollback()
-            return None
+        if user.balance >= total_price:
+            order_status = 'In-Transit'
+            new_balance = user.balance - total_price
+        else:
+            order_status = 'Refunded'
+            new_balance = user.balance
 
-        new_order = Order(user_id=user.user_id, order_total=0.0)
+        print(f"Tvořím objednávku, status: {order_status}, total_price: {total_price}, user_balance: {user.balance}")
+
+        new_order = Order(user_id=user.user_id, order_total=total_price, order_status=order_status)
         new_order.create_with_connection(conn)
         order_id = new_order.order_id
 
-        for prod_id in product_ids:
-            product = Product.read(prod_id)
-            if not product:
-                continue
-            order_item = OrderItem(order_id=order_id, product_id=prod_id, quantity=1)
-            order_item.create_with_connection(conn)
-
-        sql_sum = """
-                UPDATE orders
-                SET order_total = (
-                    SELECT SUM(p.price * oi.quantity)
-                    FROM orderItems oi
-                    JOIN products p ON oi.product_id = p.product_id
-                    WHERE oi.order_id = %s
-                )
-                WHERE order_id = %s
-            """
-        cursor.execute(sql_sum, (order_id, order_id))
-
-        new_balance = user.balance - total_price
-        sql_user_update = "UPDATE users SET balance=%s WHERE user_id=%s"
-        cursor.execute(sql_user_update, (new_balance, user.user_id))
+        if order_status == 'In-Transit':
+            for prod_id in valid_product_ids:
+                order_item = OrderItem(order_id=order_id, product_id=prod_id, quantity=1)
+                order_item.create_with_connection(conn)
+            user.balance = new_balance
+            user.update_balance_with_connection(conn)
 
         conn.commit()
+        print("Objednávka byla úspěšně vytvořena a už je na cestě.")
         return order_id
 
     except mysql.connector.Error as db_err:

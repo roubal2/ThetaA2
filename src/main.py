@@ -2,6 +2,7 @@
 import sys
 from src.models.user import User
 from src.models.order import Order
+from src.database_connection import get_connection
 from src.services.order_service import create_order_interactive
 from src.services.import_service import (
     import_categories_csv, import_orders_csv,
@@ -35,6 +36,7 @@ def main():
             print("Neplatná volba, zkus to znovu.")
 
 def handle_create_user():
+    conn = get_connection()
     try:
         username = input("Zadej uživatelské jméno: ").strip()
         email = input("Zadej email: ").strip()
@@ -53,12 +55,16 @@ def handle_create_user():
         is_active = bool(is_active_int)
 
         user = User(username=username, email=email, balance=balance, is_active=is_active)
-        user.create()
+        user.create_with_connection(conn)
+        conn.commit()
         print(f"Uživatel {user.username} (ID {user.user_id}) vytvořen.")
     except ValueError:
         print("Chyba: Špatný formát čísla (balance nebo is_active).")
     except Exception as e:
         print(f"Chyba při vytváření uživatele: {e}")
+    finally:
+        if conn and conn.is_connected():
+            conn.close()
 
 def handle_create_order_trans():
     try:
@@ -71,9 +77,11 @@ def handle_create_order_trans():
             return
 
         list_of_items = parse_category_product_input(items_input)
+        if not list_of_items:
+            print("Žádné platné položky byly zadány. Ruším objednávku.")
+            return
 
         order_id = create_order_interactive(user_id, list_of_items)
-
         if order_id is not None:
             print(f"Objednávka (ID: {order_id}) byla úspěšně vytvořena.")
         else:
@@ -153,7 +161,6 @@ def handle_import_menu():
         print("Návrat do hlavního menu.")
     else:
         print("Neplatná volba importu.")
-
 
 if __name__ == "__main__":
     main()

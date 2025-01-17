@@ -5,6 +5,7 @@ from src.models.category import Category
 from src.models.product import Product
 from src.models.order import Order
 from src.models.orderItem import OrderItem
+from src.database_connection import get_connection
 
 def import_categories_csv(csv_path):
     try:
@@ -26,6 +27,8 @@ def import_categories_csv(csv_path):
 
 
 def import_products_json(json_path):
+    conn = get_connection()
+    cursor = conn.cursor()
     try:
         with open(json_path, 'r', encoding='utf-8') as f:
             data = json.load(f)
@@ -35,7 +38,8 @@ def import_products_json(json_path):
                     product_name=item["product_name"],
                     price=item["price"]
                 )
-                p.create()
+                p.create_with_connection(conn)
+        conn.commit()
         print("Import produktů z JSON úspěšně dokončen.")
     except FileNotFoundError:
         print(f"Chyba: Soubor {json_path} nebyl nalezen.")
@@ -45,8 +49,15 @@ def import_products_json(json_path):
         print("Chyba: Soubor není validní JSON.")
     except Exception as e:
         print(f"Chyba při importu produktů: {e}")
+    finally:
+        if 'cursor' in locals():
+            cursor.close()
+        if 'conn' in locals() and conn.is_connected():
+            conn.close()
 
 def import_users_csv(csv_path):
+    conn = get_connection()
+    cursor = conn.cursor()
     try:
         with open(csv_path, newline='', encoding='utf-8') as f:
             reader = csv.reader(f)
@@ -60,7 +71,8 @@ def import_users_csv(csv_path):
                 balance = float(row[2])
                 is_active = bool(int(row[3]))
                 u = User(username=username, email=email, balance=balance, is_active=is_active)
-                u.create()
+                u.create_with_connection(conn)
+        conn.commit()
         print("Import uživatelů z CSV úspěšně dokončen.")
     except FileNotFoundError:
         print(f"Chyba: Soubor {csv_path} nebyl nalezen.")
@@ -70,8 +82,15 @@ def import_users_csv(csv_path):
         print("Chyba: Špatný formát čísla (balance nebo is_active).")
     except Exception as e:
         print(f"Chyba při importu uživatelů: {e}")
+    finally:
+        if 'cursor' in locals():
+            cursor.close()
+        if 'conn' in locals() and conn.is_connected():
+            conn.close()
 
 def import_orders_csv(csv_path):
+    conn = get_connection()
+    cursor = conn.cursor()
     try:
         with open(csv_path, newline='', encoding='utf-8') as f:
             reader = csv.reader(f)
@@ -87,7 +106,8 @@ def import_orders_csv(csv_path):
                     order_status=order_status,
                     order_date=order_date
                 )
-                o.create_with_connection()
+                o.create_with_connection(conn)
+        conn.commit()
         print("Import objednávek z CSV úspěšně dokončen.")
     except FileNotFoundError:
         print(f"Chyba: Soubor {csv_path} nebyl nalezen.")
@@ -97,8 +117,15 @@ def import_orders_csv(csv_path):
         print("Chyba: Špatný formát čísla (user_id nebo order_total).")
     except Exception as e:
         print(f"Chyba při importu objednávek: {e}")
+    finally:
+        if 'cursor' in locals():
+            cursor.close()
+        if 'conn' in locals() and conn.is_connected():
+            conn.close()
 
 def import_order_items_json(json_path):
+    conn = get_connection()
+    cursor = conn.cursor()
     try:
         with open(json_path, 'r', encoding='utf-8') as f:
             data = json.load(f)
@@ -108,7 +135,8 @@ def import_order_items_json(json_path):
                     product_id=item["product_id"],
                     quantity=item["quantity"]
                 )
-                oi.create_with_connection()
+                oi.create_with_connection(conn)
+        conn.commit()
         print("Import orderItems z JSON úspěšně dokončen.")
     except FileNotFoundError:
         print(f"Chyba: Soubor {json_path} nebyl nalezen.")
@@ -118,3 +146,8 @@ def import_order_items_json(json_path):
         print("Chyba: Soubor není validní JSON.")
     except Exception as e:
         print(f"Chyba při importu order_items: {e}")
+    finally:
+        if 'cursor' in locals():
+            cursor.close()
+        if 'conn' in locals() and conn.is_connected():
+            conn.close()
