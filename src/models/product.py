@@ -15,10 +15,10 @@ class Product:
         cursor = conn.cursor()
         try:
             sql = """
-                INSERT INTO products (category_id, product_name, price, product_status, created_at)
-                VALUES (%s, %s, %s, %s, NOW())
+                INSERT INTO products (category_id, product_name, price, created_at)
+                VALUES (%s, %s, %s, NOW())
             """
-            values = (self.category_id, self.product_name, self.price, self.product_status)
+            values = (self.category_id, self.product_name, self.price)
             cursor.execute(sql, values)
             conn.commit()
             self.product_id = cursor.lastrowid

@@ -1,0 +1,11 @@
+username,email,balance,is_active,created_at
+user1,user1@example.com,200.2,1,2025-01-01 10:00:00
+user2,user2@example.com,190.08,0,2025-01-01 10:00:00
+user3,user3@example.com,800.0,1,2025-01-01 10:00:00
+user4,user4@example.com,700.0,1,2025-01-01 10:00:00
+user5,user5@example.com,650.0,1,2025-01-01 10:00:00
+user6,user6@example.com,440.0,0,2025-01-01 10:00:00
+user7,user7@example.com,550.0,1,2025-01-01 10:00:00
+user8,user8@example.com,490.0,0,2025-01-01 10:00:00
+user9,user9@example.com,760.0,1,2025-01-01 10:00:00
+user10,user10@example.com,390.0,1,2025-01-01 10:00:00
